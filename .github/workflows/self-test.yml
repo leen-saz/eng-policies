@@ -1,0 +1,62 @@
+name: self-test
+
+# This repository's own CI. Not reusable: it protects eng-policies itself.
+#   1. actionlint on every workflow (reusable ones and the caller templates)
+#   2. shellcheck on every shell script
+#   3. the installer end to end against examples/sample-app (new project, then idempotence, then conflicts)
+#   4. the sample app runs the real reusable ci.yml of this repo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ACTIONLINT_VERSION: "1.7.12"
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install actionlint
+        run: |
+          bash <(curl -sSfL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "${ACTIONLINT_VERSION}"
+      - name: Lint workflows and caller templates
+        run: ./actionlint -color .github/workflows/*.yml templates/workflows/*.yml
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: ShellCheck
+        run: shellcheck --severity=style install/*.sh test/*.sh
+
+  installer-e2e:
+    needs: [actionlint, shellcheck]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Run the installer against examples/sample-app and run its gates locally
+        run: bash test/e2e-installer.sh
+
+  sample-app-ci:
+    needs: [actionlint, shellcheck]
+    # Runs the real reusable ci.yml of this very commit against the sample app.
+    uses: ./.github/workflows/ci.yml
+    with:
+      working-directory: examples/sample-app

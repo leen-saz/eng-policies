@@ -1,0 +1,193 @@
+name: Deploy (reusable)
+
+# Call on push to main:
+#   jobs:
+#     deploy:
+#       uses: <owner>/eng-policies/.github/workflows/deploy.yml@v1
+#       secrets:
+#         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#
+# staging    -> deployed automatically after the merge
+# production -> only through the GitHub Environment named `production` (required reviewer)
+# D1 migrations are applied per environment BEFORE its deploy.
+# Environment-level secrets of the same name override the ones passed by the caller,
+# so staging and production can use different Cloudflare tokens.
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        default: "."
+      node-version:
+        type: string
+        default: "22"
+      package-manager:
+        type: string
+        default: "npm"
+      install-command:
+        type: string
+        default: "npm ci"
+      build-command:
+        description: "Empty string skips the build (Wrangler bundles the Worker itself)"
+        type: string
+        default: ""
+      d1-binding:
+        type: string
+        default: "DB"
+      migrations-dir:
+        type: string
+        default: "migrations"
+      staging-url:
+        description: "Optional. When set, a health check runs after the staging deploy and gates production"
+        type: string
+        default: ""
+      production-url:
+        description: "Optional. When set, a health check runs after the production deploy"
+        type: string
+        default: ""
+      health-path:
+        type: string
+        default: "/health"
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  staging:
+    name: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v6
+      - run: corepack enable
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.install-command }}
+      - name: Build
+        if: inputs.build-command != ''
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.build-command }}
+      - name: Apply D1 migrations (staging)
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          BINDING: ${{ inputs.d1-binding }}
+          MIG_DIR: ${{ inputs.migrations-dir }}
+        run: |
+          if [ -d "$MIG_DIR" ]; then
+            npx wrangler d1 migrations apply "$BINDING" --env staging --remote
+          else
+            echo "No migrations directory, skipping."
+          fi
+      - name: Deploy (staging)
+        working-directory: ${{ inputs.working-directory }}
+        run: npx wrangler deploy --env staging
+      - name: Health check (staging)
+        if: inputs.staging-url != ''
+        env:
+          URL: ${{ inputs.staging-url }}${{ inputs.health-path }}
+        run: |
+          for i in $(seq 1 20); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$URL" || true)"
+            echo "attempt $i: HTTP $code"
+            if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then exit 0; fi
+            sleep 3
+          done
+          echo "::error title=staging health::Staging did not become healthy. Production is blocked."
+          exit 1
+
+  production:
+    name: production
+    needs: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The reviewer approval gate lives in the GitHub Environment named `production`.
+    environment:
+      name: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v6
+      - run: corepack enable
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.install-command }}
+      - name: Build
+        if: inputs.build-command != ''
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.build-command }}
+      - name: Record the D1 Time Travel bookmark (rollback point)
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          BINDING: ${{ inputs.d1-binding }}
+          MIG_DIR: ${{ inputs.migrations-dir }}
+        run: |
+          if [ -d "$MIG_DIR" ]; then
+            {
+              echo "### D1 Time Travel bookmark before production migrations"
+              echo '```'
+              npx wrangler d1 time-travel info "$BINDING" --env production 2>&1 || echo "(could not read the bookmark)"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Apply D1 migrations (production)
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          BINDING: ${{ inputs.d1-binding }}
+          MIG_DIR: ${{ inputs.migrations-dir }}
+        run: |
+          if [ -d "$MIG_DIR" ]; then
+            npx wrangler d1 migrations apply "$BINDING" --env production --remote
+          else
+            echo "No migrations directory, skipping."
+          fi
+      - name: Deploy (production)
+        working-directory: ${{ inputs.working-directory }}
+        run: npx wrangler deploy --env production
+      - name: Health check (production)
+        if: inputs.production-url != ''
+        env:
+          URL: ${{ inputs.production-url }}${{ inputs.health-path }}
+        run: |
+          for i in $(seq 1 20); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$URL" || true)"
+            echo "attempt $i: HTTP $code"
+            if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then exit 0; fi
+            sleep 3
+          done
+          echo "::error title=production health::Production did not become healthy. Roll back with the previous Worker version or the Time Travel bookmark."
+          exit 1
