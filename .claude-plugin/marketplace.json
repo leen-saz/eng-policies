@@ -1,0 +1,11 @@
+{
+  "name": "eng-policies",
+  "owner": { "name": "leen-saz" },
+  "plugins": [
+    {
+      "name": "eng-policies",
+      "source": "./",
+      "description": "Engineering policies and skills: new-project, adopt-existing, debug, bug-hunt."
+    }
+  ]
+}

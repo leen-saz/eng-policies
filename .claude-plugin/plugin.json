@@ -1,0 +1,6 @@
+{
+  "name": "eng-policies",
+  "version": "1.0.0-alpha.1",
+  "description": "Engineering policies for GitHub + Cloudflare projects: new-project, adopt-existing, debug and bug-hunt skills.",
+  "author": { "name": "leen-saz" }
+}
