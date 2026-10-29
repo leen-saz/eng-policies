@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: ShellCheck
-        run: shellcheck --severity=style install/*.sh test/*.sh
+        run: shellcheck -x --severity=style install/*.sh test/*.sh
 
   installer-e2e:
     needs: [actionlint, shellcheck]
