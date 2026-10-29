@@ -1,0 +1,22 @@
+# dependencies and build output
+node_modules/
+dist/
+build/
+.wrangler/
+
+# secrets: never commit these
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+!.env.example
+
+# tests
+playwright-report/
+test-results/
+coverage/
+
+# misc
+*.log
+.DS_Store

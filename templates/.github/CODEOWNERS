@@ -1,0 +1,10 @@
+# Every change needs a review from the owner. Narrow this down as the team grows.
+*                       @__OWNER_HANDLE__
+
+# Changes here alter what is allowed to ship: always reviewed by the owner.
+/.github/               @__OWNER_HANDLE__
+/migrations/            @__OWNER_HANDLE__
+/wrangler.jsonc         @__OWNER_HANDLE__
+/docs/architecture.md   @__OWNER_HANDLE__
+/docs/adr/              @__OWNER_HANDLE__
+/CLAUDE.md              @__OWNER_HANDLE__

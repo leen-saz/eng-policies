@@ -1,0 +1,21 @@
+name: ai-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ai-review:
+    if: github.event.pull_request.draft == false
+    uses: __POLICY_OWNER__/eng-policies/.github/workflows/ai-review.yml@__POLICY_REF__
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

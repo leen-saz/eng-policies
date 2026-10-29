@@ -1,0 +1,56 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "__APP_NAME__",
+  "main": "src/index.ts",
+  "compatibility_date": "__COMPAT_DATE__",
+  "workers_dev": true,
+  "preview_urls": true,
+  "observability": { "enabled": true },
+
+  // d1_databases, r2_buckets, kv_namespaces and vars are NOT inherited between environments.
+  // Every environment declares its own bindings, and each one has its OWN D1 database and R2 bucket.
+  // The all-zero IDs below are placeholders: install/cloudflare-setup.sh replaces them with the real IDs.
+  // Need KV for fast lookups? Add inside each environment:
+  //   "kv_namespaces": [{ "binding": "CACHE", "id": "<namespace id from: wrangler kv namespace create>" }]
+  "env": {
+    "preview": {
+      "name": "__APP_NAME__-preview",
+      "vars": { "ENVIRONMENT": "preview" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "__APP_NAME__-preview-db",
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "__APP_NAME__-preview-files" }]
+    },
+    "staging": {
+      "name": "__APP_NAME__-staging",
+      "vars": { "ENVIRONMENT": "staging" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "__APP_NAME__-staging-db",
+          "database_id": "00000000-0000-0000-0000-000000000002",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "__APP_NAME__-staging-files" }]
+    },
+    "production": {
+      "name": "__APP_NAME__",
+      "vars": { "ENVIRONMENT": "production" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "__APP_NAME__-production-db",
+          "database_id": "00000000-0000-0000-0000-000000000003",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "__APP_NAME__-production-files" }]
+    }
+  }
+}

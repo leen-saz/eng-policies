@@ -1,0 +1,20 @@
+name: codeql
+
+# Needs GitHub Code Security on private repositories. Delete this file if the repository is private
+# and the plan does not include it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  codeql:
+    uses: __POLICY_OWNER__/eng-policies/.github/workflows/codeql.yml@__POLICY_REF__

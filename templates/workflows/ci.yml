@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The job id MUST stay `ci`: the ruleset requires the check named "ci / gate".
+  ci:
+    uses: __POLICY_OWNER__/eng-policies/.github/workflows/ci.yml@__POLICY_REF__
+    with:
+      package-manager: "__PACKAGE_MANAGER__"
+      install-command: "__INSTALL_CMD__"
+      lint-command: "__LINT_CMD__"
+      lint-mode: "__LINT_MODE__"
+      typecheck-command: "__TYPECHECK_CMD__"
+      typecheck-mode: "__TYPECHECK_MODE__"
+      unit-command: "__UNIT_CMD__"
+      integration-command: "__INTEGRATION_CMD__"
+      build-command: "__BUILD_CMD__"
+      audit-command: "__AUDIT_CMD__"

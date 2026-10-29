@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development (wrangler dev reads it). .dev.vars is git-ignored.
+# This file lists the NAMES of the secrets only. Never put a real value here.
+# Set the real values per environment with:  npx wrangler secret put NAME --env staging
+EXAMPLE_API_KEY=replace-me
