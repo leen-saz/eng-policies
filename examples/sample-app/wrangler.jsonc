@@ -1,0 +1,53 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "eng-policies-sample-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-15",
+  "workers_dev": true,
+  "preview_urls": true,
+  "observability": { "enabled": true },
+
+  // Bindings (d1_databases, r2_buckets, kv_namespaces, vars) are NOT inherited between environments.
+  // Every environment declares its own, and each one has its OWN D1 database and R2 bucket.
+  "env": {
+    "preview": {
+      "name": "eng-policies-sample-app-preview",
+      "vars": { "ENVIRONMENT": "preview" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "eng-policies-sample-app-preview-db",
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "eng-policies-sample-app-preview-files" }]
+    },
+    "staging": {
+      "name": "eng-policies-sample-app-staging",
+      "vars": { "ENVIRONMENT": "staging" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "eng-policies-sample-app-staging-db",
+          "database_id": "00000000-0000-0000-0000-000000000002",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "eng-policies-sample-app-staging-files" }]
+    },
+    "production": {
+      "name": "eng-policies-sample-app",
+      "vars": { "ENVIRONMENT": "production" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "eng-policies-sample-app-production-db",
+          "database_id": "00000000-0000-0000-0000-000000000003",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "eng-policies-sample-app-production-files" }]
+    }
+  }
+}

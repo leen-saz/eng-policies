@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local development. .dev.vars is git-ignored.
+# Never put a real secret in this example file.
+EXAMPLE_API_KEY=replace-me

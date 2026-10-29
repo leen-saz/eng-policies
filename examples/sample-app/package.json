@@ -1,0 +1,30 @@
+{
+  "name": "eng-policies-sample-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal Worker + D1 app that passes every eng-policies gate. Used by self-test.yml.",
+  "scripts": {
+    "dev": "wrangler dev --env staging",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test",
+    "build": "wrangler deploy --dry-run --outdir dist --env staging",
+    "db:migrate:local": "wrangler d1 migrations apply DB --env staging --local",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261029.1",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.13.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.156.0"
+  }
+}
