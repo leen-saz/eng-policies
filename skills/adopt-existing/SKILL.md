@@ -1,58 +1,73 @@
 ---
 name: adopt-existing
-description: Bring an EXISTING project (brownfield) under eng-policies in small independent modules, one PR each, without breaking what works. Use when the user says "adopt eng-policies in this repo", "bring this project up to standard", or "set up CI and policies for the existing project".
+description: Adopt eng-policies on an EXISTING live project (brownfield) in modules M0 to M10, one branch and PR per module, including the move from Vercel to Cloudflare. Use when the user says "adopt eng-policies on this project", "bring this project up to standard", or "move this app from Vercel to Cloudflare".
 ---
 
-# Adopt eng-policies in an existing project (brownfield)
+# Adopt eng-policies on an existing project (modular)
 
-Principle: every module is independent, small, reversible and ships as its own PR. The project must keep working after each one. Nothing is rewritten, no dependency is added, and no schema is changed unless the owner approves it.
+The system is live. Do not rewrite working code, do not change behaviour, do not touch production unless a module says so and the owner approves.
 
-> Note for the owner: this is the first version of the brownfield flow. If you have a more specific "Prompt 2" adoption flow, replace the modules below with it. The rules in "Hard rules" stay.
+## How to run
+- Work through the modules in order. Each module is one branch `adopt/mN-<name>` and one PR.
+- At the start of each module, say in two lines what it will change. At the end show: files changed, tests run with results, CI status, and anything the owner must do by hand.
+- Stop after each module and wait for approval before merging and moving on.
+- Track state in `docs/adoption/PROGRESS.md` (module, status, PR link, notes) so any session can resume.
+- If a module is blocked or too big, mark it `deferred` with the reason and continue with the next independent one. Modules marked (needs X) depend on earlier ones; the rest can run in any order after M2.
+- Never print, commit or ask the owner to paste secret values. Give the exact command for the owner to run.
+- Check the current official docs (Cloudflare, GitHub, OpenNext) before writing any config. Do not rely on memory for flags or limits.
 
-## Hard rules
-- Never overwrite an existing file: the installer writes `*.policy-new` for conflicts, and you merge by hand with the owner.
-- Never leave the current architecture, add a dependency, change the schema, or rewrite working code without the owner's explicit approval. If a module seems to need it, stop and ask.
-- Lint and typecheck start as `warn-only`. Every other gate is blocking from day one.
-- No secrets in code, logs or chat. If a scan finds one, report its location only, and tell the owner to rotate it.
-- Ask before: creating or changing GitHub or Cloudflare settings, pushing, opening PRs.
-- Track everything in `docs/adoption/PROGRESS.md`.
+## Accounts (check before every module)
+- GitHub: the repo lives on the owner's GitHub account registered with the wellunion email.
+- Cloudflare: the target account is the one registered with the brands email.
+- Vercel: the app is live there and stays live until cutover.
+- The owner logs in herself (`gh auth login`, `wrangler login`, `vercel login`). Before any command that writes, run `gh auth status` and `wrangler whoami` and show which account is active. If it is the wrong one, stop.
+- GitHub reaches Cloudflare through GitHub Actions plus a scoped Cloudflare API token (Workers, D1, R2 edit on that account only), stored as GitHub secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` which the owner creates and sets herself. Do not use the Cloudflare dashboard Git integration: deploys go through the CI gates.
 
-## Module 0: assess (read only, no PR)
-Read, do not change. Produce a short report for the owner:
-- stack: language, package manager, test runner, frameworks, how it is deployed today
-- is there a Worker/wrangler config, D1, R2, KV? Which environments exist?
-- CI today (workflows, what they run), branch rules, secrets in use (names only)
-- tests: what exists, rough coverage of the risky paths, how long they take
-- run the current lint, typecheck, tests and build once and record the baseline (pass/fail, counts)
-- dry run of the installer: `bash <policies>/install/install.sh . --mode existing --dry-run`
-Ask the owner which modules to do and in what order. Default order below.
+## Run order
+M0, M1, M2, M3, M9 (move off Vercel), M4, M5, M6, M7, M8, M10.
+The safety-net tests (M3) come before the move so they can prove the Cloudflare version behaves exactly like the Vercel one.
 
-## Module 1: install the policies (mode existing)
-Branch `chore/adopt-eng-policies`. Run `install.sh . --mode existing`, then walk through every `*.policy-new` with the owner and merge by hand (wrangler config: add `env.preview/staging/production` blocks, each with its own D1 and R2). Commit the result. This module only adds files.
+## Modules
 
-## Module 2: CI baseline green
-Open the PR so the new `ci` workflow runs. Goal: the `ci / gate` check is green with lint and typecheck as warn-only. If a blocking gate fails (tests, build, audit, secret scan), classify each failure: real bug, flaky test, or environment difference, and fix the smallest thing. A flaky test gets a ticket and a quarantine note in PROGRESS.md, never a silent skip. Record the baseline numbers.
+### M0: Recon and snapshot (read-only)
+Inventory the stack, entry points, deploy method, database, external services, env vars (names only), and test coverage. Confirm the app builds and runs locally. Ask the owner to take a DB backup and confirm it. Output `docs/adoption/RECON.md` with a risk list ranked high to low. No code changes.
 
-## Module 3: secrets hygiene
-Run the secret scan on the full history once (`secret-scan-full-history: true` in a temporary run, or `gitleaks git` locally). For each finding: location only, owner rotates the secret, then add a `.gitleaksignore` entry with a comment only after rotation. Move any secret from code to `.dev.vars` (local) and `wrangler secret put` / GitHub Secrets. Give the owner the exact commands.
+### M1: Repo hygiene (needs M0)
+Put the project on GitHub if it is not. Add `.gitignore`, `.dev.vars.example`, PR template, CODEOWNERS. Scan the full git history for committed secrets and list each one (name and file, never the value) so the owner can rotate it.
 
-## Module 4: environments
-Make sure each environment (preview, staging, production) has its own D1 and R2 in the wrangler config. Create the resources with `cloudflare-setup.sh` (dry run first, then `--apply` after approval). Create the GitHub environments and ruleset with `github-setup.sh` (dry run first). Production must require the owner as reviewer. Do not change what production runs on before the owner agrees.
+### M2: Document the core (needs M0)
+Run BMAD's brownfield `document-project` flow. Produce `docs/architecture.md` (how it works today), `docs/prd.md` (what it does today) and the project `CLAUDE.md` from the template. This becomes the core that must not be left. The owner reviews and approves it before anything else changes.
 
-## Module 5: migrations under control
-If the project has a D1 schema: put it under `migrations/` as numbered files without changing the live schema (a baseline that matches production exactly, verified against a dump of the schema). Enable the migration check. If the schema is not in D1, skip.
+### M3: Safety-net tests (needs M2)
+Write characterization tests that pin current behaviour of the most critical flows from RECON's risk list (start with the top 5). Tests must pass against unchanged code. No refactoring.
 
-## Module 6: tests around the risky paths
-Add characterization tests for the most important flows (the ones that lose money or data if they break), without changing behavior. Add the integration and E2E skeleton if missing. One PR per flow.
+### M4: CI, gradual (needs M3)
+Install the caller workflows from eng-policies (`install.sh . --mode existing`). Build and tests are required; lint and typecheck run warn-only. Record the warning count as the baseline in PROGRESS.md.
 
-## Module 7: preview, deploy and review workflows
-Enable `preview` (PR previews and E2E), `deploy` (staging automatic, production by approval), `ai-review` (needs the ANTHROPIC_API_KEY secret, owner sets it), `codeql` (needs GitHub Code Security on private repos). Check each with a real PR before relying on it.
+### M5: Security
+Move secrets out of code into GitHub Secrets and Cloudflare secrets (the owner runs the set commands). Enable Dependabot and CodeQL. Report vulnerable dependencies; upgrade only patch versions here, larger upgrades become separate stories.
 
-## Module 8: flip warn-only to blocking
-Per gate (lint, then typecheck): list the violations, fix by area with small PRs (auto-fixers first, behavior changes never mixed in), then set the mode to `block`, update PROGRESS.md. Never do this in one giant PR.
+### M6: Database baseline (needs M3)
+Capture the current schema as `migrations/0000_baseline.sql` without altering the live DB. Add an index review: list slow or unindexed queries as stories, do not apply them yet.
 
-## Module 9: docs backfill
-Write `docs/architecture.md` from the code as it is today (describe, do not redesign), add ADRs for decisions that are still visible in the code, and fill `CLAUDE.md` (summary, forbidden changes, commands).
+### M7: Environments and gates (needs M4)
+Create staging (own D1 and R2) and the production environment gate with the owner as required reviewer. Apply the `main` ruleset (PR and CI required, no force-push) with `github-setup.sh`. Turn on Cloudflare logs and observability. Dry run first, ask before `--apply`.
 
-## After each module
-Update `docs/adoption/PROGRESS.md`, run the project's gates, open the PR, and give the owner a two line summary: what changed, what to check. Stop and ask before the next module.
+### M8: Bug hunt and AI review (needs M4)
+Enable the AI review workflow. Run the `bug-hunt` skill across the codebase. Output a ranked report and open one GitHub issue per confirmed bug with reproduction steps. Fix nothing in this module.
+
+### M9: Move from Vercel to Cloudflare (needs M3)
+Vercel keeps serving production until the final switch; every step is reversible.
+1. Map every Vercel feature in use to its Cloudflare equivalent, from the official docs, and show the table before changing anything: framework build (Next.js to the `@opennextjs/cloudflare` adapter), env vars (names via `vercel env ls`), Vercel KV / Postgres / Blob to KV / D1 or Hyperdrive / R2, cron jobs to Cron Triggers, middleware, image optimization, redirects and headers, analytics. Flag anything with no clean equivalent.
+2. Build the app on Workers in a branch, with `wrangler.jsonc` defining `staging` and `production`, each with its own bindings.
+3. Data: if data lives in a Vercel-managed store, write a one-off copy script into the staging stores first. Production data is copied only at cutover, after a fresh backup.
+4. Verify on staging: run the M3 characterization tests and E2E against the staging URL. They must pass with the same results as against Vercel.
+5. Cutover plan (the owner approves before it starts): lower DNS TTL a day ahead if possible, freeze writes or sync data, switch the domain to the Cloudflare Worker, watch logs for 30 minutes, keep Vercel deployed untouched for 7 days as rollback.
+6. Rollback: a written one-step procedure to point the domain back to Vercel.
+If the move is too big for one night, move the smallest independent route first behind a Cloudflare route and leave the rest on Vercel; each further piece becomes a story.
+
+### M10: Tighten
+Switch lint and typecheck from warn-only to required once warnings are fixed or explicitly waived. Update PROGRESS.md with the final state and a list of follow-up stories.
+
+## Definition of done (tonight)
+M0 to M8 merged or explicitly deferred with a reason, CI green on `main`, staging deploy working, production behind the owner's approval, and `PROGRESS.md` showing exactly what is left.
