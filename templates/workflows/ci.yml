@@ -27,3 +27,9 @@ jobs:
       integration-command: "__INTEGRATION_CMD__"
       build-command: "__BUILD_CMD__"
       audit-command: "__AUDIT_CMD__"
+      # Python code in the project? Uncomment and adjust:
+      # python-version: "3.12"
+      # python-requirements: "requirements.txt"
+      # python-test-command: "python -m unittest discover -s tests"
+      # package.json in a subfolder? Also set install-command (for example "cd web && npm ci")
+      # and node-cache-path: "web/package-lock.json"

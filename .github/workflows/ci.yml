@@ -8,6 +8,7 @@ name: CI (reusable)
 #
 # Stages run in order and fail fast:
 #   lint -> typecheck -> unit -> integration -> build -> migrations -> security -> gate
+# Python projects: set python-version, python-requirements and python-test-command (tests run in the unit stage).
 # A project can set lint-mode / typecheck-mode to `warn-only` (brownfield adoption).
 
 on:
@@ -19,6 +20,22 @@ on:
       node-version:
         type: string
         default: "22"
+      node-cache-path:
+        description: "Lockfile path for the Node cache, relative to the repo root. Empty = <working-directory>/<lockfile of the package manager>. Set it when package.json is in a subfolder but working-directory is '.'"
+        type: string
+        default: ""
+      python-version:
+        description: "Empty = no Python. Set (for example '3.12') for projects that have Python code"
+        type: string
+        default: ""
+      python-requirements:
+        description: "requirements file to install and cache on, relative to the repo root (empty = install nothing)"
+        type: string
+        default: ""
+      python-test-command:
+        description: "Python tests, run in the unit stage (for example: python -m unittest discover -s tests). Empty skips"
+        type: string
+        default: ""
       package-manager:
         description: "npm | pnpm | yarn (used for dependency caching)"
         type: string
@@ -91,10 +108,19 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+          cache-dependency-path: ${{ inputs.node-cache-path != '' && inputs.node-cache-path || format('{0}/{1}', inputs.working-directory, inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: ${{ inputs.install-command }}
+      - uses: actions/setup-python@v6
+        if: inputs.python-version != ''
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: ${{ inputs.python-requirements != '' && 'pip' || '' }}
+          cache-dependency-path: ${{ inputs.python-requirements }}
+      - name: Install Python requirements
+        if: inputs.python-version != '' && inputs.python-requirements != ''
+        run: python -m pip install -r "${{ inputs.python-requirements }}"
       - name: Lint
         id: lint
         if: inputs.lint-command != ''
@@ -117,7 +143,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+          cache-dependency-path: ${{ inputs.node-cache-path != '' && inputs.node-cache-path || format('{0}/{1}', inputs.working-directory, inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: ${{ inputs.install-command }}
@@ -143,14 +169,27 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+          cache-dependency-path: ${{ inputs.node-cache-path != '' && inputs.node-cache-path || format('{0}/{1}', inputs.working-directory, inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: ${{ inputs.install-command }}
+      - uses: actions/setup-python@v6
+        if: inputs.python-version != ''
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: ${{ inputs.python-requirements != '' && 'pip' || '' }}
+          cache-dependency-path: ${{ inputs.python-requirements }}
+      - name: Install Python requirements
+        if: inputs.python-version != '' && inputs.python-requirements != ''
+        run: python -m pip install -r "${{ inputs.python-requirements }}"
       - name: Unit tests
         if: inputs.unit-command != ''
         working-directory: ${{ inputs.working-directory }}
         run: ${{ inputs.unit-command }}
+      - name: Python tests
+        if: inputs.python-test-command != ''
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.python-test-command }}
 
   integration:
     name: integration
@@ -164,7 +203,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+          cache-dependency-path: ${{ inputs.node-cache-path != '' && inputs.node-cache-path || format('{0}/{1}', inputs.working-directory, inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: ${{ inputs.install-command }}
@@ -185,10 +224,19 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+          cache-dependency-path: ${{ inputs.node-cache-path != '' && inputs.node-cache-path || format('{0}/{1}', inputs.working-directory, inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: ${{ inputs.install-command }}
+      - uses: actions/setup-python@v6
+        if: inputs.python-version != ''
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: ${{ inputs.python-requirements != '' && 'pip' || '' }}
+          cache-dependency-path: ${{ inputs.python-requirements }}
+      - name: Install Python requirements
+        if: inputs.python-version != '' && inputs.python-requirements != ''
+        run: python -m pip install -r "${{ inputs.python-requirements }}"
       - name: Build
         if: inputs.build-command != ''
         working-directory: ${{ inputs.working-directory }}
@@ -235,7 +283,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+          cache-dependency-path: ${{ inputs.node-cache-path != '' && inputs.node-cache-path || format('{0}/{1}', inputs.working-directory, inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
       - run: corepack enable
         if: steps.locate.outputs.run == 'true'
       - name: Install
@@ -294,7 +342,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+          cache-dependency-path: ${{ inputs.node-cache-path != '' && inputs.node-cache-path || format('{0}/{1}', inputs.working-directory, inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
       - name: Dependency audit
         if: inputs.audit-command != ''
         working-directory: ${{ inputs.working-directory }}

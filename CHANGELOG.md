@@ -2,6 +2,12 @@
 
 كل التغييرات المهمة هنا. الصيغة مبنية على Keep a Changelog، والإصدارات على SemVer.
 
+## [Unreleased]
+
+### Added
+- ci.yml: دعم Python (`python-version`, `python-requirements`, `python-test-command`) و`node-cache-path` للمشاريع اللي فيها package.json بمجلد فرعي.
+- self-test: job `mixed-app-ci` على fixture فيه Python و Node بمجلد فرعي.
+
 ## [1.0.0-alpha.1]
 
 ### Added

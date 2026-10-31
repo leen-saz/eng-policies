@@ -60,3 +60,21 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       working-directory: examples/sample-app
+
+  mixed-app-ci:
+    needs: [actionlint, shellcheck]
+    # Python at the root, Node in a subfolder: the layout of a project like well-ads-dashboard.
+    uses: ./.github/workflows/ci.yml
+    with:
+      working-directory: test/fixtures/mixed-app
+      install-command: cd web && npm ci
+      node-cache-path: test/fixtures/mixed-app/web/package-lock.json
+      lint-command: ""
+      typecheck-command: ""
+      unit-command: cd web && node --test
+      python-version: "3.12"
+      python-requirements: test/fixtures/mixed-app/requirements.txt
+      python-test-command: python -m unittest discover -s tests
+      integration-command: ""
+      build-command: python build.py
+      audit-command: ""
