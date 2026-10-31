@@ -21,6 +21,7 @@ concurrency:
 
 env:
   ACTIONLINT_VERSION: "1.7.12"
+  SHELLCHECK_PY_VERSION: "0.11.0.1"
 
 jobs:
   actionlint:
@@ -39,6 +40,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+      # Pinned: the runner image's shellcheck changes with the ubuntu-latest label
+      - name: Install ShellCheck
+        run: |
+          pip install --user "shellcheck-py==${SHELLCHECK_PY_VERSION}"
+          shellcheck --version
       - name: ShellCheck
         run: shellcheck -x --severity=style install/*.sh test/*.sh
 
