@@ -31,5 +31,8 @@ jobs:
       # python-version: "3.12"
       # python-requirements: "requirements.txt"
       # python-test-command: "python -m unittest discover -s tests"
+      # python-lint-command: "ruff check ."
+      # Supabase / Postgres instead of D1 (ADR 0001 in eng-policies):
+      # db-engine: "postgres"
       # package.json in a subfolder? Also set install-command (for example "cd web && npm ci")
       # and node-cache-path: "web/package-lock.json"

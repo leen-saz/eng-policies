@@ -81,6 +81,8 @@ jobs:
       python-version: "3.12"
       python-requirements: test/fixtures/mixed-app/requirements.txt
       python-test-command: python -m unittest discover -s tests
+      python-lint-command: ruff check .
+      db-engine: postgres
       integration-command: ""
       build-command: python build.py
       audit-command: ""
