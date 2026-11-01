@@ -362,7 +362,24 @@ jobs:
           CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS 'SELECT NULL::uuid';
           CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS 'SELECT NULL::text';
           CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS 'SELECT NULL::jsonb';
+          CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY, email text, created_at timestamptz DEFAULT now());
+          CREATE SCHEMA IF NOT EXISTS vault;
           SQL
+          # Stand-in for the supabase_vault extension (plain text, CI only), so `create extension supabase_vault`
+          # and the vault.create_secret / update_secret / decrypted_secrets calls in migrations resolve
+          ext="$(docker exec pg sh -c 'ls -d /usr/share/postgresql/*/extension | head -1')"
+          docker exec -i pg sh -c "cat > $ext/supabase_vault.control" <<'EOF'
+          comment = 'CI stand-in for Supabase Vault (plain text, never used with real secrets)'
+          default_version = '0.0.0'
+          relocatable = false
+          schema = vault
+          EOF
+          docker exec -i pg sh -c "cat > $ext/supabase_vault--0.0.0.sql" <<'EOF'
+          CREATE TABLE vault.secrets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text UNIQUE, description text NOT NULL DEFAULT '', secret text NOT NULL, key_id uuid, nonce bytea, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+          CREATE FUNCTION vault.create_secret(new_secret text, new_name text DEFAULT NULL, new_description text DEFAULT '', new_key_id uuid DEFAULT NULL) RETURNS uuid LANGUAGE sql AS $$ INSERT INTO vault.secrets (secret, name, description) VALUES (new_secret, new_name, new_description) RETURNING id $$;
+          CREATE FUNCTION vault.update_secret(secret_id uuid, new_secret text DEFAULT NULL, new_name text DEFAULT NULL, new_description text DEFAULT NULL, new_key_id uuid DEFAULT NULL) RETURNS void LANGUAGE sql AS $$ UPDATE vault.secrets SET secret = coalesce(new_secret, secret), name = coalesce(new_name, name), description = coalesce(new_description, description), updated_at = now() WHERE id = secret_id $$;
+          CREATE VIEW vault.decrypted_secrets AS SELECT *, secret AS decrypted_secret FROM vault.secrets;
+          EOF
           shopt -s nullglob
           files=("$MIG_DIR"/*.sql)
           [ ${#files[@]} -gt 0 ] || { echo "::notice title=migrations::$MIG_DIR has no .sql files"; exit 0; }
